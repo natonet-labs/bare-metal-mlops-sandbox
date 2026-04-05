@@ -14,7 +14,7 @@
 |---|---|---|
 | 1 | Assign static IP via netplan | Done (2026-04-05) |
 | 2 | Open UFW firewall ports | Done (via K3s agent install) |
-| 3 | Configure xrdp remote access | Pending |
+| 3 | Configure xrdp remote access | Skipped — SSH only (no GUI workloads on worker) |
 | 4 | Copy registry config from panda-control | Done |
 | 5 | Join K3s cluster as agent | Done (2026-04-04) |
 | 6 | Verify cluster state | Done |
@@ -180,52 +180,15 @@ sudo ufw enable
 
 ---
 
-## Step 3 — xrdp Remote Access
+## Step 3 — Remote Access
 
-Same configuration as panda-control. The `gnome-remote-desktop` conflict applies to all Ubuntu 24.04 nodes.
+panda-worker is a pure compute node with no GUI workloads. xrdp is not installed. Access is SSH only.
 
-**Install xrdp and XFCE4:**
 ```bash
-sudo apt install xrdp xorgxrdp xfce4 xfce4-goodies -y
-echo "startxfce4" > ~/.xsession
-sudo chmod 640 /etc/xrdp/key.pem
-sudo chown root:ssl-cert /etc/xrdp/key.pem
-sudo usermod -aG ssl-cert xrdp
-sudo ufw allow 3389/tcp
-sudo systemctl enable xrdp
-sudo systemctl start xrdp
+ssh delta@panda-worker.local
 ```
 
-**Mask gnome-remote-desktop at both levels** (critical — will steal port 3389 otherwise):
-```bash
-sudo systemctl disable --now gnome-remote-desktop
-sudo systemctl mask gnome-remote-desktop
-systemctl --user disable gnome-remote-desktop
-systemctl --user mask gnome-remote-desktop
-```
-
-**Regenerate certificate for hostname:**
-```bash
-sudo openssl req -x509 -newkey rsa:2048 -nodes \
-  -keyout /etc/xrdp/key.pem \
-  -out /etc/xrdp/cert.pem \
-  -days 3650 \
-  -subj "/CN=panda-worker"
-
-sudo chmod 640 /etc/xrdp/key.pem
-sudo chown root:ssl-cert /etc/xrdp/key.pem
-sudo systemctl restart xrdp
-```
-
-**Connection details:**
-
-| Property | Value |
-|---|---|
-| Host | `panda-worker.local` / `<your-static-ip>` |
-| Port | `3389` |
-| Session | XFCE4 |
-
-> **Wayland note:** Ubuntu 24.04 defaults to Wayland. xrdp requires X11. Select **Ubuntu on Xorg** at GDM login. See node01 configuration guide §8.7 for details.
+If xrdp is ever needed (e.g. for a GUI debugging session), follow the same procedure as panda-control in `node01-dx-m1-initial-configuration.md` §8, substituting `panda-worker` for the hostname.
 
 ---
 
@@ -329,8 +292,7 @@ delta@panda-worker (Node 02)
 ├── Observability
 │   └── node-exporter (scraped by Prometheus on panda-control, port 9100)
 └── Remote Access
-    ├── SSH (port 22)
-    └── xrdp / XFCE4 (port 3389)
+    └── SSH (port 22)
 ```
 
 ---
