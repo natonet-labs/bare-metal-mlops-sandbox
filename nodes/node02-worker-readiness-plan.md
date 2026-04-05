@@ -198,7 +198,7 @@ panda-worker is a pure compute node with no GUI workloads. xrdp is not installed
 ssh <your-username>@panda-worker.local
 ```
 
-If xrdp is ever needed (e.g. for a GUI debugging session), follow the same procedure as panda-control in `node01-dx-m1-initial-configuration.md` §8, substituting `panda-worker` for the hostname.
+If xrdp is ever needed (e.g. for a GUI debugging session), follow the same procedure as panda-control in `docs/hardware/node01-dx-m1-initial-configuration.md` §8, substituting `panda-worker` for the hostname.
 
 ---
 
