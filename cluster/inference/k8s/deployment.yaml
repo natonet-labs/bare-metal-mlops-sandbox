@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yolov8n-inference
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolov8n-inference
+  template:
+    metadata:
+      labels:
+        app: yolov8n-inference
+    spec:
+      hostPID: true
+      containers:
+        - name: inference
+          image: panda-control:32034/inference/yolov8n:v1.0.0-003
+          ports:
+            - containerPort: 8000
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: dxrt
+              mountPath: /dev/dxrt0
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: dxrt
+          hostPath:
+            path: /dev/dxrt0
+            type: CharDevice
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yolov8n-inference
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: yolov8n-inference
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 31000

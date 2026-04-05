@@ -1,0 +1,363 @@
+# Node 01 — Single-Node Readiness Plan
+
+**Hostname:** `panda-control`
+**Goal:** Get node 01 production-ready as a K3s control plane before node 02 (worker) arrives.
+**Date:** 2026-04-02
+
+---
+
+## Order of Work
+
+| Step | Task | Status |
+|---|---|---|
+| 1 | Install K3s and verify single-node cluster | Done |
+| 2 | Reserve static IP, open firewall ports | Done |
+| 3 | Deploy local registry, push first inference image | Done |
+| 4 | Deploy node_exporter + Prometheus + Grafana | Done |
+| 5 | Build and deploy FastAPI inference container (YOLOv8N) | Done |
+| 6 | Add latency/FPS metrics to inference container | Done |
+| 7 | Build initial Grafana dashboard | Done |
+
+---
+
+## Step 1 — Install K3s (Single-Node Control Plane)
+
+Install K3s with TLS SANs for both hostname and static IP so the API server certificate remains valid when node 02 joins.
+
+```bash
+curl -sfL https://get.k3s.io | sh -s - \
+  --tls-san panda-control.local \
+  --tls-san <your-static-ip> \
+  --write-kubeconfig-mode 644
+```
+
+**Verify:**
+```bash
+kubectl get nodes
+kubectl get pods -A
+```
+
+Expected: node status `Ready`, core K3s pods running in `kube-system`.
+
+Save the join token for node 02:
+```bash
+sudo cat /var/lib/rancher/k3s/server/node-token
+```
+
+---
+
+## Step 2 — Networking
+
+**Reserve a static IP** on your router by MAC address (not on the OS). This keeps the API server address stable when node 02 joins.
+
+**Open required UFW ports:**
+
+```bash
+sudo ufw allow 6443/tcp    # K3s API server — workers join here
+sudo ufw allow 10250/tcp   # Kubelet
+sudo ufw allow 8472/udp    # Flannel VXLAN — pod-to-pod traffic
+sudo ufw allow 51820/udp   # Flannel WireGuard (if enabled)
+```
+
+**Verify:**
+```bash
+sudo ufw status
+```
+
+---
+
+## Step 3 — Local Docker Registry
+
+Run the registry as a K3s pod so it is part of the cluster from day one.
+
+```bash
+kubectl create deployment registry --image=registry:2 --port=5000
+```
+
+Expose as NodePort — run as a single line (backslash continuations cause shell errors):
+```bash
+kubectl expose deployment registry --type=NodePort --port=5000 --target-port=5000 --name=registry
+```
+
+Check the assigned NodePort:
+```bash
+kubectl get svc registry
+```
+
+> Note: `kubectl expose` does not support a `--node-port` flag. The NodePort is assigned randomly by K3s. On this cluster it was assigned `32034`. Note the port from `kubectl get svc` and use it consistently in `registries.yaml` and all image references.
+
+Verify the registry is reachable:
+```bash
+curl http://panda-control:32034/v2/
+# Expected: {}
+```
+
+**Configure K3s to trust the local registry (HTTP):**
+
+```bash
+sudo mkdir -p /etc/rancher/k3s
+sudo tee /etc/rancher/k3s/registries.yaml <<EOF
+mirrors:
+  "panda-control:32034":
+    endpoint:
+      - "http://panda-control:32034"
+EOF
+sudo systemctl restart k3s
+```
+
+> When node 02 joins, add the same `registries.yaml` on that node so it pulls images from `panda-control` automatically.
+
+### Tag Strategy
+
+```
+panda-control:32034/<workload>/<model>:<model-version>-<build>
+
+# Examples:
+panda-control:32034/inference/yolov8n:v1.0.0-001
+panda-control:32034/inference/scrfd-face:v1.0.0-001
+```
+
+- `<workload>` — service category (inference, classifier, etc.)
+- `<model>` — model name, lowercase, hyphenated
+- `<model-version>` — semantic version of the model weights
+- `<build>` — auto-incremented build number from GitHub Actions
+
+### Cleanup Policy
+
+Enable deletion in registry config and run garbage collection via a K3s CronJob. Keep the last 3 tags per image; delete untagged layers on every GC run.
+
+---
+
+## Step 4 — Observability Stack
+
+Deploy via Helm using the kube-prometheus-stack chart, which bundles Prometheus, Grafana, AlertManager, node-exporter, and kube-state-metrics in a single install.
+
+**Install Helm:**
+```bash
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+**Set KUBECONFIG** (required — add to ~/.bashrc to make permanent):
+```bash
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+```
+
+**Add chart repo and install:**
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+kubectl create namespace monitoring
+helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --set grafana.adminPassword=<your-password> \
+  --set prometheus.prometheusSpec.retention=15d
+```
+
+**Expose Grafana as NodePort:**
+```bash
+kubectl patch svc kube-prometheus-stack-grafana -n monitoring \
+  --type='json' \
+  -p='[{"op":"replace","path":"/spec/type","value":"NodePort"},{"op":"add","path":"/spec/ports/0/nodePort","value":32000}]'
+sudo ufw allow 32000/tcp
+```
+
+**Access Grafana:** `http://panda-control.local:32000` — login: `admin` / `<your-password>`
+
+Deploy in this order: node_exporter first for immediate host visibility, then Prometheus, then Grafana.
+
+### Metrics to Collect
+
+| Metric | Tool | Purpose |
+|---|---|---|
+| Inference latency (ms) | Custom Prometheus exporter in inference service | Core performance indicator |
+| Throughput (FPS) | Same exporter | Capacity planning |
+| NPU temperature (3 cores) | dxrt-cli scraper | Thermal stability under load |
+| NPU memory usage | dxrt-cli scraper | Detect model memory leaks |
+| Host CPU usage | node_exporter | Verify NPU offloading, not CPU |
+| Host RAM usage | node_exporter | Catch framework overhead |
+| Pod restarts | kube-state-metrics | Detect crashes and OOM kills |
+| Container CPU/mem | cAdvisor | Per-workload resource tracking |
+
+### Key Grafana Dashboard Panels
+
+- Inference latency over time — line chart, alert threshold at 50ms
+- NPU core temperatures — 3 gauges (one per core)
+- FPS throughput — line chart
+- Host CPU vs NPU load — side-by-side to validate offloading
+
+---
+
+## Step 5 — First Model Deployment (YOLOv8N Inference Service)
+
+**Deployed as:** systemd service on the host, exposed to K3s via ExternalName service.
+
+**Model selection rationale:**
+
+| Model | Format | Size | Task | Latency on DX-M1 |
+|---|---|---|---|---|
+| YOLOv8N | .dxnn | ~6 MB | Object detection | ~10-20ms |
+| SCRFD500M | .dxnn | ~2 MB | Face detection | ~10-15ms |
+| MobileNetV2 | .dxnn | ~14 MB | Classification | ~5ms |
+| YOLOv8N-SEG | .dxnn | ~7 MB | Segmentation | ~20-30ms |
+
+### Why Not a Container
+
+Containerizing the DX-M1 inference workload was attempted and encountered a chain of issues:
+
+| Issue | Fix Applied |
+|---|---|
+| `dx_engine` not found | Copied from host venv into Docker build context |
+| `libdxrt.so` missing | Copied from `/usr/local/lib/` into image |
+| `python-multipart` missing | Added to Dockerfile pip install |
+| `dxrt service is not running` | Added `hostPID: true` to pod spec |
+| `Fail to initialize device 0` | Added `privileged: true` to container security context |
+| InferenceEngine hangs indefinitely | Root cause: `dxrtd` uses `/dev/dxrt0` as a kernel-level IPC bus; container process credentials and cgroup context prevent the kernel driver from routing messages back to the containerized client — not fixable via pod spec flags |
+
+**Root cause:** The DX-RT daemon (`dxrtd`) owns the NPU via `/dev/dxrt0`. `InferenceEngine` communicates with `dxrtd` through the kernel driver using process context (credentials/cgroup) for message routing. Container isolation prevents this routing from completing even with `hostPID` and `privileged` mode.
+
+**Pattern for bare metal hardware accelerators:** run the inference workload natively on the host, expose it to K3s as a cluster service via ExternalName. This is the same pattern used for proprietary GPU/NPU hardware before device plugins exist.
+
+### systemd Service Setup
+
+Install dependencies into the dx-venv:
+```bash
+source ~/dx-all-suite/dx-venv/bin/activate
+pip install uvicorn fastapi python-multipart prometheus-client
+```
+
+Create the service:
+```bash
+sudo tee /etc/systemd/system/yolov8n-inference.service <<EOF
+[Unit]
+Description=YOLOv8N NPU Inference Service
+After=dxrt.service
+Requires=dxrt.service
+
+[Service]
+User=delta
+WorkingDirectory=/home/delta/natonet-labs/bare-metal-mlops-sandbox/cluster/inference
+ExecStart=/home/delta/dx-all-suite/dx-venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5s
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now yolov8n-inference
+```
+
+> **Note:** `MODEL_PATH` in `app.py` must be the host filesystem path, not a container path:
+> `/home/delta/dx-all-suite/workspace/res/models/models-2_2_1/YoloV8N.dxnn`
+
+Verify:
+```bash
+curl http://localhost:8000/health
+# Expected: {"status":"ok","model":"YoloV8N"}
+```
+
+### K3s ExternalName Service
+
+Register the host service in K3s so other pods can reach it via cluster DNS:
+```bash
+kubectl apply -f k8s/host-service.yaml
+```
+
+`cluster/inference/k8s/host-service.yaml` points to `panda-control.local:8000`.
+
+### Metrics (Step 6)
+
+Metrics are built into `app.py` — no separate step required. The `/metrics` endpoint exposes:
+- `inference_requests_total` — request counter
+- `inference_latency_ms` — histogram (buckets: 5-200ms)
+- `detections_per_frame` — histogram
+
+Verify:
+```bash
+curl http://localhost:8000/metrics
+```
+
+---
+
+## Step 6 — Inference Metrics Exporter
+
+Add a Prometheus metrics endpoint to the inference container exposing:
+
+- `inference_latency_ms` — histogram
+- `inference_fps` — gauge
+- `npu_temperature_celsius` — gauge per core (scraped from dxrt-cli)
+- `npu_memory_used_bytes` — gauge
+
+---
+
+## Step 7 — Grafana Dashboard
+
+Build dashboards from the metrics collected in Steps 4 and 6. Store dashboard JSON in the repo under `cluster/grafana/dashboards/` so they are version-controlled and reproducible.
+
+---
+
+## Storage Upgrade — 256GB → 512GB (Completed 2026-04-03)
+
+The OS drive was upgraded from a Transcend 430S 256GB to a Transcend 430S 512GB SATA SSD while the system remained live.
+
+**Procedure:**
+1. Stop write-heavy services:
+   ```bash
+   sudo systemctl stop yolov8n-inference
+   sudo systemctl stop k3s
+   ```
+2. Clone live with dd (no eMMC reboot required):
+   ```bash
+   sudo dd if=/dev/sda of=/dev/sdb bs=4M status=progress conv=fsync
+   ```
+3. Physical drive swap: removed 256GB from B-Key slot, inserted 512GB.
+4. Booted normally, then expanded partition and filesystem:
+   ```bash
+   sudo growpart /dev/sda 2
+   sudo resize2fs /dev/sda2
+   ```
+5. Restarted services:
+   ```bash
+   sudo systemctl start k3s
+   sudo systemctl start yolov8n-inference
+   ```
+
+**Result:** `/dev/sda2` — 468G total, 73G used, 374G available.
+
+---
+
+## Node 02 Join (Completed 2026-04-04)
+
+`panda-worker` arrived and joined the cluster as a K3s agent.
+
+**Join command (run on panda-worker):**
+```bash
+curl -sfL https://get.k3s.io | K3S_URL=https://<panda-control-ip>:6443 K3S_TOKEN=<node-token> sh -
+```
+
+**Registry config (copy from panda-control, run on panda-worker):**
+```bash
+# from panda-control:
+scp /etc/rancher/k3s/registries.yaml delta@panda-worker.local:/tmp/registries.yaml
+
+# on panda-worker:
+sudo mkdir -p /etc/rancher/k3s
+sudo mv /tmp/registries.yaml /etc/rancher/k3s/registries.yaml
+sudo systemctl restart k3s-agent
+```
+
+**Verified:**
+```
+NAME            STATUS   ROLES           AGE   VERSION
+panda-control   Ready    control-plane   43h   v1.34.6+k3s1
+panda-worker    Ready    <none>          74s   v1.34.6+k3s1
+```
+
+Pre-requisites that enabled smooth join:
+- Static IP reserved on router (Step 2)
+- Port 6443 open on panda-control (Step 2)
+- TLS SANs set at K3s install time (Step 1)
+- Registry config copied post-join (Step 3)
