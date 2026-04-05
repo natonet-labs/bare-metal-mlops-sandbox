@@ -1,0 +1,35 @@
+name: Build and Push registry-gc
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - cluster/registry-gc/**
+
+jobs:
+  build:
+    runs-on: [self-hosted, panda-control]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy kubectl binary into build context
+        run: cp /usr/local/bin/kubectl cluster/registry-gc/kubectl
+
+      - name: Build image
+        run: |
+          docker build \
+            -t panda-control:32034/tools/registry-gc:${{ github.sha }} \
+            -t panda-control:32034/tools/registry-gc:latest \
+            cluster/registry-gc/
+
+      - name: Push image
+        run: |
+          docker push panda-control:32034/tools/registry-gc:${{ github.sha }}
+          docker push panda-control:32034/tools/registry-gc:latest
+
+      - name: Clean up build context
+        if: always()
+        run: rm -f cluster/registry-gc/kubectl
