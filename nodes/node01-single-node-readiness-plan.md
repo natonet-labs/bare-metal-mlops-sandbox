@@ -127,7 +127,11 @@ panda-control:32034/inference/scrfd-face:v1.0.0-001
 
 ### Cleanup Policy
 
-Enable deletion in registry config and run garbage collection via a K3s CronJob. Keep the last 3 tags per image; delete untagged layers on every GC run.
+Registry deletion is enabled via `REGISTRY_STORAGE_DELETE_ENABLED=true` on the registry deployment. A K3s CronJob (`registry-gc`) runs daily at 03:00 UTC and:
+- Prunes all but the 3 most recent tags per image via the registry API
+- Runs `registry garbage-collect --delete-untagged=true` inside the registry pod to reclaim storage
+
+See `cluster/registry-gc/` for the CronJob manifests and GC script.
 
 ---
 

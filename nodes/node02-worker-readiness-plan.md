@@ -224,6 +224,13 @@ curl http://panda-control:32034/v2/
 # Expected: {}
 ```
 
+> **`panda-control` must be resolvable without `.local` on panda-worker.** The `.local` suffix is resolved via mDNS at the OS level, but containerd (the K3s container runtime) uses standard DNS and does not participate in mDNS. If `panda-control` is not in `/etc/hosts`, containerd will fail to pull images from the registry with `dial tcp: lookup panda-control: Try again` — even though `ssh delta@panda-control.local` works fine from the same machine.
+>
+> Add the entry to `/etc/hosts` on panda-worker:
+> ```bash
+> echo "<panda-control-ip> panda-control" | sudo tee -a /etc/hosts
+> ```
+
 ---
 
 ## Step 5 — K3s Agent Join

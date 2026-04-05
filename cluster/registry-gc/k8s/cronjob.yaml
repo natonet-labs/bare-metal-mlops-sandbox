@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: registry-gc
+  namespace: default
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: registry-gc
+          restartPolicy: OnFailure
+          containers:
+            - name: gc
+              image: panda-control:32034/tools/registry-gc:v1.0.0
+              imagePullPolicy: Always
