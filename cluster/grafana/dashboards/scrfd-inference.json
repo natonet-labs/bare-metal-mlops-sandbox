@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4128503048507392,
+  "id": 760996871368704,
   "links": [],
   "panels": [
     {
@@ -200,13 +200,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(detections_per_frame_sum{job=\"yolov8n-inference\"}[1m]) / rate(detections_per_frame_count{job=\"yolov8n-inference\"}[1m])",
+          "expr": "rate(faces_per_frame_sum{job=\"scrfd-inference\"}[1m]) / rate(faces_per_frame_count{job=\"scrfd-inference\"}[1m])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Avg Detections per Frame",
+      "title": "Avg Faces per Frame",
       "type": "timeseries"
     },
     {
@@ -294,7 +294,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(inference_requests_total{job=\"yolov8n-inference\"}[1m])",
+          "expr": "rate(inference_requests_total{job=\"scrfd-inference\"}[1m])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -392,7 +392,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(inference_latency_ms_sum{job=\"yolov8n-inference\"}[1m]) / rate(inference_latency_ms_count{job=\"yolov8n-inference\"}[1m])",
+          "expr": "rate(inference_latency_ms_sum{job=\"scrfd-inference\"}[1m]) / rate(inference_latency_ms_count{job=\"scrfd-inference\"}[1m])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -414,8 +414,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "YOLOv8N Inference - panda-control",
-  "uid": "adw4zx4",
-  "version": 3,
+  "title": "SCRFD Inference - panda-control",
+  "uid": "scrfd-inference-panda-control",
+  "version": 1,
   "weekStart": ""
 }
