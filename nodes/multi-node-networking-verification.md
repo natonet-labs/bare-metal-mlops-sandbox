@@ -99,3 +99,55 @@ Cross-node pod networking confirmed working. Flannel VXLAN (port 8472/UDP) and k
 - Pod IPs are in the `10.42.0.0/16` range — K3s default Flannel CIDR. panda-control pods get `10.42.0.x`, panda-worker pods get `10.42.1.x`.
 - `nodeName` in the pod spec overrides the scheduler and pins the pod to a specific node — useful for testing but not how production workloads should be placed. Use `nodeSelector` or taints/tolerations for real scheduling constraints.
 - UFW port `8472/UDP` must be open on both nodes for Flannel VXLAN to function. It was opened during node setup.
+
+---
+
+## How Pod IPs Are Assigned (host-local CNI)
+
+Understanding why a pod gets a specific IP helps with debugging and reasoning about the cluster state.
+
+### The pod CIDR is divided per node
+
+K3s reserves `10.42.0.0/16` for all pods. Flannel splits this into per-node `/24` subnets when each node joins:
+
+| Node | Subnet |
+|---|---|
+| panda-control | `10.42.0.0/24` |
+| panda-worker | `10.42.1.0/24` |
+
+### host-local CNI handles allocation
+
+IP assignment within each node's subnet is handled by the **host-local CNI plugin**, not Flannel directly. It maintains a ledger of allocated IPs in:
+
+```
+/var/lib/cni/networks/cbr0/
+```
+
+Each allocated IP has its own file in that directory containing the container ID that holds it. When a pod is deleted cleanly, its file is removed.
+
+Inspect the ledger on any node:
+```bash
+sudo ls /var/lib/cni/networks/cbr0/
+```
+
+On panda-worker after this verification, the ledger contained:
+```
+10.42.1.5   last_reserved_ip.0   lock
+```
+
+- `10.42.1.5` — active allocation for `svclb-traefik` (K3s built-in ingress pod)
+- `last_reserved_ip.0` — tracks the last IP handed out
+- `lock` — prevents concurrent allocation races
+
+### Allocation is sequential and forward-only
+
+host-local does **not** scan from the beginning of the subnet on every allocation. It reads `last_reserved_ip.0` and starts from the next address after the last one assigned. This means:
+
+- Deleted pod IPs are not immediately reused — the allocator advances forward past them
+- It only wraps back to the start of the subnet after exhausting the range
+
+**Why `nginx-worker` got `10.42.1.6`:** Over the 36 hours since panda-worker joined, daemonset pods and test pods had come and gone, advancing `last_reserved_ip.0` forward to `.5` (the current `svclb-traefik` allocation). When `nginx-worker` was created, the allocator tried `.6` next, found it free, and assigned it. Addresses `.2`–`.4` were genuinely free but skipped because the allocator does not scan backwards.
+
+### Why forward-only allocation is intentional
+
+Avoiding immediate IP reuse prevents a new pod from inheriting stale DNS entries, open connections, or cached routes that still point to a just-deleted pod at the same address. The forward-advancing counter provides a natural grace period before an address is recycled.
