@@ -1,7 +1,7 @@
 import os
 import time
-import numpy as np
 import cv2
+import numpy as np
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
@@ -10,17 +10,12 @@ from starlette.responses import Response
 from dx_engine import InferenceEngine
 
 MODEL_PATH = os.environ["MOBILENETV2_MODEL_PATH"]
-TOP_K = 5
 
 # Prometheus metrics
 REQUEST_COUNT = Counter("inference_requests_total", "Total inference requests")
 INFERENCE_LATENCY = Histogram(
     "inference_latency_ms", "NPU inference latency in milliseconds",
     buckets=[1, 2, 5, 10, 15, 20, 30, 50, 100]
-)
-TOP1_CONFIDENCE = Histogram(
-    "top1_confidence", "Confidence of top-1 classification result",
-    buckets=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
 )
 
 _engine_ctx = None
@@ -50,12 +45,9 @@ def preprocess(img_bgr, target_h, target_w):
     return img_resized[np.newaxis, ...].astype(np.uint8)
 
 
-def postprocess(outputs, top_k):
-    logits = outputs[0].flatten()
-    exp = np.exp(logits - np.max(logits))
-    probs = exp / exp.sum()
-    top_indices = np.argsort(probs)[::-1][:top_k]
-    return [(int(idx), float(probs[idx])) for idx in top_indices]
+def postprocess(outputs):
+    # Model applies argmax internally — output is a single uint16 class ID
+    return int(outputs[0][0])
 
 
 @app.get("/health")
@@ -77,19 +69,12 @@ async def infer(file: UploadFile = File(...)):
     outputs = engine.run([inp])
     latency_ms = (time.perf_counter() - t0) * 1000
 
-    predictions = postprocess(outputs, TOP_K)
+    class_id = postprocess(outputs)
 
     REQUEST_COUNT.inc()
     INFERENCE_LATENCY.observe(latency_ms)
-    TOP1_CONFIDENCE.observe(predictions[0][1])
 
-    return {
-        "latency_ms": round(latency_ms, 2),
-        "predictions": [
-            {"class_id": cls_id, "confidence": round(conf, 4)}
-            for cls_id, conf in predictions
-        ],
-    }
+    return {"latency_ms": round(latency_ms, 2), "class_id": class_id}
 
 
 @app.get("/metrics")
