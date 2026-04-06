@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: yolov8n-seg-inference
+  namespace: default
+spec:
+  type: ExternalName
+  externalName: panda-control.local
+  ports:
+    - port: 8004
+      targetPort: 8004
