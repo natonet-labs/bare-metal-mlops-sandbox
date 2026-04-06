@@ -1,9 +1,0 @@
-# Build context files — copied locally before docker build, not committed
-dx_engine/
-libdxrt.so
-libonnxruntime.so.1
-models/
-
-# Python
-__pycache__/
-*.pyc

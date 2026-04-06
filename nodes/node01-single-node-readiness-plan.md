@@ -243,7 +243,7 @@ Requires=dxrt.service
 
 [Service]
 User=<your-username>
-WorkingDirectory=/home/<your-username>/natonet-labs/bare-metal-mlops-sandbox/cluster/inference
+WorkingDirectory=/home/<your-username>/natonet-labs/bare-metal-mlops-sandbox/cluster/inference/yolov8n
 ExecStart=/home/<your-username>/dx-all-suite/dx-venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8000
 Restart=on-failure
 RestartSec=5s
@@ -273,7 +273,7 @@ Register the host service in K3s so other pods can reach it via cluster DNS:
 kubectl apply -f k8s/host-service.yaml
 ```
 
-`cluster/inference/k8s/host-service.yaml` points to `panda-control.local:8000`.
+`cluster/inference/yolov8n/k8s/host-service.yaml` points to `panda-control.local:8000`.
 
 ### Metrics (Step 6)
 
