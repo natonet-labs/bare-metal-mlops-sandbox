@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 760996871368704,
+  "id": null,
   "links": [],
   "panels": [
     {
@@ -62,7 +62,7 @@
               "mode": "none"
             },
             "thresholdsStyle": {
-              "mode": "off"
+              "mode": "line"
             }
           },
           "mappings": [],
@@ -71,14 +71,15 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 50
               }
             ]
-          }
+          },
+          "unit": "ms"
         },
         "overrides": []
       },
@@ -88,7 +89,7 @@
         "x": 0,
         "y": 0
       },
-      "id": 4,
+      "id": 1,
       "options": {
         "legend": {
           "calcs": [],
@@ -105,14 +106,18 @@
       "pluginVersion": "12.4.2",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "editorMode": "code",
-          "expr": "(avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)",
-          "legendFormat": "__auto",
+          "expr": "rate(inference_latency_ms_sum{job=\"$job\"}[1m]) / rate(inference_latency_ms_count{job=\"$job\"}[1m])",
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Host CPU Usage %",
+      "title": "NPU Inference Latency (ms)",
       "type": "timeseries"
     },
     {
@@ -165,116 +170,23 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               },
               {
                 "color": "red",
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "reqps"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "id": 3,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.4.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "rate(faces_per_frame_sum{job=\"scrfd-inference\"}[1m]) / rate(faces_per_frame_count{job=\"scrfd-inference\"}[1m])",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Avg Faces per Frame",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
+        "x": 12,
+        "y": 0
       },
       "id": 2,
       "options": {
@@ -294,8 +206,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(inference_requests_total{job=\"scrfd-inference\"}[1m])",
-          "legendFormat": "__auto",
+          "expr": "rate(inference_requests_total{job=\"$job\"}[1m])",
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
@@ -353,7 +265,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               },
               {
                 "color": "red",
@@ -368,9 +280,9 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 24
+        "y": 8
       },
-      "id": 1,
+      "id": 3,
       "options": {
         "legend": {
           "calcs": [],
@@ -387,18 +299,14 @@
       "pluginVersion": "12.4.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
           "editorMode": "code",
-          "expr": "rate(inference_latency_ms_sum{job=\"scrfd-inference\"}[1m]) / rate(inference_latency_ms_count{job=\"scrfd-inference\"}[1m])",
-          "legendFormat": "__auto",
+          "expr": "rate(detections_per_frame_sum{job=\"$job\"}[1m]) / rate(detections_per_frame_count{job=\"$job\"}[1m])\nor\nrate(faces_per_frame_sum{job=\"$job\"}[1m]) / rate(faces_per_frame_count{job=\"$job\"}[1m])",
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "NPU Inference Latency (ms)",
+      "title": "Avg Detections per Frame",
       "type": "timeseries"
     }
   ],
@@ -406,7 +314,36 @@
   "schemaVersion": 42,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "yolov8n-inference",
+          "value": "yolov8n-inference"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Service",
+        "multi": false,
+        "name": "job",
+        "options": [
+          {
+            "selected": true,
+            "text": "yolov8n-inference",
+            "value": "yolov8n-inference"
+          },
+          {
+            "selected": false,
+            "text": "scrfd-inference",
+            "value": "scrfd-inference"
+          }
+        ],
+        "query": "yolov8n-inference,scrfd-inference",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
   },
   "time": {
     "from": "now-6h",
@@ -414,8 +351,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SCRFD Inference - panda-control",
-  "uid": "scrfd-inference-panda-control",
+  "title": "NPU Inference Services",
+  "uid": "npu-inference",
   "version": 1,
   "weekStart": ""
 }
