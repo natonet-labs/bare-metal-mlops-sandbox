@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vision-analyzer
+  namespace: inference
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vision-analyzer
+  template:
+    metadata:
+      labels:
+        app: vision-analyzer
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: panda-worker
+      containers:
+        - name: vision-analyzer
+          image: panda-control:32034/inference/vision-analyzer:latest
+          ports:
+            - containerPort: 8005
+          env:
+            - name: YOLOV8N_INFERENCE_URL
+              value: "http://192.168.7.63:8001"  # replace with your panda-control IP
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"

@@ -1,0 +1,32 @@
+name: Build and Push vision-analyzer
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - cluster/inference/vision-analyzer/**
+
+jobs:
+  build:
+    runs-on: [self-hosted, panda-control]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set build tag
+        id: tag
+        run: echo "BUILD_TAG=v1.0.0-$(printf '%03d' ${{ github.run_number }})" >> $GITHUB_OUTPUT
+
+      - name: Build image
+        run: |
+          docker build \
+            -t panda-control:32034/inference/vision-analyzer:${{ steps.tag.outputs.BUILD_TAG }} \
+            -t panda-control:32034/inference/vision-analyzer:latest \
+            cluster/inference/vision-analyzer/
+
+      - name: Push image
+        run: |
+          docker push panda-control:32034/inference/vision-analyzer:${{ steps.tag.outputs.BUILD_TAG }}
+          docker push panda-control:32034/inference/vision-analyzer:latest
