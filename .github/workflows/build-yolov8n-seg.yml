@@ -1,0 +1,32 @@
+name: Build and Push yolov8n-seg
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - cluster/inference/yolov8n-seg/**
+
+jobs:
+  build:
+    runs-on: [self-hosted, panda-control]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set build tag
+        id: tag
+        run: echo "BUILD_TAG=v1.0.0-$(printf '%03d' ${{ github.run_number }})" >> $GITHUB_OUTPUT
+
+      - name: Build image
+        run: |
+          docker build \
+            -t panda-control:32034/inference/yolov8n-seg:${{ steps.tag.outputs.BUILD_TAG }} \
+            -t panda-control:32034/inference/yolov8n-seg:latest \
+            cluster/inference/yolov8n-seg/
+
+      - name: Push image
+        run: |
+          docker push panda-control:32034/inference/yolov8n-seg:${{ steps.tag.outputs.BUILD_TAG }}
+          docker push panda-control:32034/inference/yolov8n-seg:latest
