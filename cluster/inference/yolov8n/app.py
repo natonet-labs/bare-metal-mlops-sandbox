@@ -1,4 +1,5 @@
 import io
+import os
 import time
 import numpy as np
 import cv2
@@ -9,7 +10,7 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 from starlette.responses import Response
 from dx_engine import InferenceEngine
 
-MODEL_PATH = "/home/delta/dx-all-suite/workspace/res/models/models-2_2_1/YoloV8N.dxnn"
+MODEL_PATH = os.environ["YOLOV8N_MODEL_PATH"]
 CONF_THRESHOLD = 0.35
 IOU_THRESHOLD = 0.45
 
