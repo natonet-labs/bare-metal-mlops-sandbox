@@ -408,3 +408,45 @@ This is not just a "production vs home lab" distinction. It applies to any clust
 Had this order been followed on panda-control — decide on Ethernet-only, configure a static IP in netplan, then install K3s — the WiFi interface would never have been a factor and `--node-ip` would have been correct from day one.
 
 **For panda-worker and any future nodes:** configure a static IP via netplan before running the K3s agent installer.
+
+### Prometheus scrape targets must use IPs, not `.local` hostnames
+
+**What happened:** The Prometheus additional scrape config for the NPU inference services used `panda-control.local` as the target hostname. Prometheus runs inside a pod and uses CoreDNS for name resolution — it has no access to mDNS, which is what resolves `.local` hostnames at the OS level. All four inference service targets showed `health: down` and no metrics were scraped.
+
+This is the same class of problem as the containerd registry hostname issue documented in the node02 plan: anything running inside a pod cannot resolve `.local` names, even if `ssh` and `curl` from the host work fine.
+
+**Secondary issue:** The Prometheus CR was configured to load scrape configs from a secret key named `inference.yaml`, but the secret had been created with key `additional-scrape-configs.yaml`. Prometheus silently failed to load the scrape config entirely, logging:
+```
+loading additional scrape configs from Secret failed: key inference.yaml could not be found in secret inference-scrape-config
+```
+
+**Root cause:** Both issues were introduced by out-of-band changes made during a previous dashboard consolidation session — the Prometheus CR and scrape config secret were modified but not committed to the repo, leaving no record of what changed or why.
+
+**Fix applied:**
+1. Recreated the `inference-scrape-config` secret with the correct key (`inference.yaml`) and target IPs instead of `.local` hostnames:
+```bash
+kubectl create secret generic inference-scrape-config \
+  --namespace monitoring \
+  --from-literal=inference.yaml="$(cat <<'EOF'
+- job_name: yolov8n-inference
+  static_configs:
+    - targets: ["192.168.7.63:8001"]
+- job_name: scrfd-inference
+  static_configs:
+    - targets: ["192.168.7.63:8002"]
+- job_name: mobilenetv2-inference
+  static_configs:
+    - targets: ["192.168.7.63:8003"]
+- job_name: yolov8n-seg-inference
+  static_configs:
+    - targets: ["192.168.7.63:8004"]
+EOF
+)" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+2. Restarted the Prometheus StatefulSet to force the config-reloader to apply the new secret:
+```bash
+kubectl rollout restart statefulset/prometheus-kube-prometheus-stack-prometheus -n monitoring
+```
+
+**Prevention:** Always use node IPs (not `.local` hostnames) in any Kubernetes resource that runs inside a pod — scrape configs, registry mirrors, ExternalName services pointing to host services. Any Kubernetes resource that changes cluster state should be committed to the repo alongside the application change that motivated it.
