@@ -58,7 +58,7 @@ Observability is handled by Prometheus and Grafana, scraping both cluster metric
 
 ## Roadmap
 
-### Phase 1 — Foundation — In Progress
+### Phase 1 — Foundation — Complete
 
 | # | Item | Status |
 |---|---|---|
