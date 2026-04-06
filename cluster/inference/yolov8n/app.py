@@ -6,7 +6,7 @@ import cv2
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from starlette.responses import Response
 from dx_engine import InferenceEngine
 
@@ -30,6 +30,7 @@ COCO_CLASSES = [
 ]
 
 # Prometheus metrics
+MODEL_INFO = Gauge("model_info", "Active model version info", ["model", "version"])
 REQUEST_COUNT = Counter("inference_requests_total", "Total inference requests")
 INFERENCE_LATENCY = Histogram(
     "inference_latency_ms", "NPU inference latency in milliseconds",
@@ -49,6 +50,7 @@ async def lifespan(app: FastAPI):
     global _engine_ctx, engine
     _engine_ctx = InferenceEngine(MODEL_PATH)
     engine = _engine_ctx.__enter__()
+    MODEL_INFO.labels(model="YoloV8N", version=engine.get_model_version()).set(1)
     yield
     _engine_ctx.__exit__(None, None, None)
 
