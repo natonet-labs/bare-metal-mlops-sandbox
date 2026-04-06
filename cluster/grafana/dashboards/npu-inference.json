@@ -336,9 +336,19 @@
             "selected": false,
             "text": "scrfd-inference",
             "value": "scrfd-inference"
+          },
+          {
+            "selected": false,
+            "text": "mobilenetv2-inference",
+            "value": "mobilenetv2-inference"
+          },
+          {
+            "selected": false,
+            "text": "yolov8n-seg-inference",
+            "value": "yolov8n-seg-inference"
           }
         ],
-        "query": "yolov8n-inference,scrfd-inference",
+        "query": "yolov8n-inference,scrfd-inference,mobilenetv2-inference,yolov8n-seg-inference",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"

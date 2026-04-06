@@ -2,11 +2,11 @@ from fastapi import FastAPI, HTTPException
 from datetime import datetime, timezone
 import httpx
 
-PROMETHEUS_URL = "http://10.43.x.x:9090"  # Prometheus ClusterIP — run: kubectl get svc -n monitoring | grep prometheus
+PROMETHEUS_URL = "http://10.43.159.3:9090"
 
 NODE_NAMES = {
-    "192.168.x.x:9100": "panda-control",  # replace with your node IPs
-    "192.168.x.x:9100": "panda-worker",
+    "192.168.7.63:9100": "panda-control",  # replace with your node IPs
+    "192.168.7.89:9100": "panda-worker",   # replace with your node IPs
 }
 
 app = FastAPI()
