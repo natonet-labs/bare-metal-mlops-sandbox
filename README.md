@@ -82,7 +82,7 @@ Observability is handled by Prometheus and Grafana, scraping both cluster metric
 | 3 | Update npu-inference Grafana dashboard with new `$job` options | Done |
 | 4 | Model version info metric — Prometheus gauge exposing active model version per service | Done |
 | 5 | Rollback procedure — re-tag registry + restart service, validated end-to-end | Done |
-| 6 | First containerized workload on panda-worker | Upcoming |
+| 6 | First containerized workload on panda-worker | Done |
 | 7 | Inference load test baseline — req/s and latency p50/p95/p99 per model under sustained load | Upcoming |
 | 8 | CPU vs. NPU benchmark — same workload on host CPU vs. DX-M1, documented results | Upcoming |
 
