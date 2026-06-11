@@ -1,7 +1,7 @@
 # Bare Metal MLOps Sandbox
 
-![Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
-![Phase](https://img.shields.io/badge/Phase-1%20Complete-green)
+![Status](https://img.shields.io/badge/Status-Concluded-blue)
+![Phase](https://img.shields.io/badge/Reached-Phase%202.7-brightgreen)
 ![OS](https://img.shields.io/badge/OS-Ubuntu%2024.04-orange?logo=ubuntu&logoColor=white)
 ![K3s](https://img.shields.io/badge/Orchestration-K3s-326CE5?logo=kubernetes&logoColor=white)
 [![DeepX DX-M1](https://img.shields.io/badge/NPU-DeepX%20DX--M1%2025%20TOPS-blue)](https://developer.deepx.ai)
@@ -14,6 +14,16 @@ The Bare Metal MLOps Sandbox is a hands-on engineering environment for learning 
 The cluster runs two LattePanda 3 Delta nodes. The control plane hosts a DeepX DX-M1 NPU accelerator, which runs computer vision inference workloads as host-native systemd services. A key discovery during this build: the DX-M1's kernel IPC mechanism (`dxrtd`) is incompatible with container process isolation — inference services must run directly on the host, exposed to the cluster via Kubernetes ExternalName services.
 
 Observability is handled by Prometheus and Grafana, scraping both cluster metrics and per-model inference latency from the NPU services. A private local Docker registry serves container images to both nodes, with a daily garbage collection CronJob to manage storage.
+
+---
+
+## Project Status — Concluded (June 2026)
+
+This sandbox has met its purpose. It stands up a two-node bare-metal Kubernetes cluster running hardware-accelerated computer-vision inference end to end — from OS provisioning and NPU driver bring-up through host-native inference services, a private registry, CI/CD, multi-node networking, and full Prometheus/Grafana observability. Phase 1 is complete, and Phase 2 reached its acceleration, serving, and load-testing milestones (through 2.7).
+
+The remaining roadmap items — Phase 2.8 and all of Phase 3 — are deliberately **deferred** rather than abandoned. They are operational hardening of infrastructure that already exists (more alert rules, autoscaling, automated rollback), with diminishing learning return relative to the foundational work above. They are kept below, marked **Deferred**, as a record of where the road would continue.
+
+The cluster keeps running and now serves as a **deployment substrate for application-layer work**: a LangChain/LangGraph voice-agent service is being built to run as a containerized workload on `panda-worker`, finally exercising the registry, Tailscale exposure, and Grafana observability with a real, non-synthetic service. That work lives in a separate repository.
 
 ---
 
@@ -73,7 +83,7 @@ Observability is handled by Prometheus and Grafana, scraping both cluster metric
 | 9 | Grafana dashboard committed to repo | Done |
 | 10 | CI/CD pipeline (GitHub Actions → local registry) | Done |
 
-### Phase 2 — Acceleration & Serving — Upcoming
+### Phase 2 — Acceleration & Serving — Complete through 2.7
 
 | # | Item | Status |
 |---|---|---|
@@ -84,17 +94,17 @@ Observability is handled by Prometheus and Grafana, scraping both cluster metric
 | 5 | Rollback procedure — re-tag registry + restart service, validated end-to-end | Done |
 | 6 | First containerized workload on panda-worker | Done |
 | 7 | Inference load test baseline — req/s and latency p50/p95/p99 per model under sustained load | Done |
-| 8 | CPU vs. NPU benchmark — same workload on host CPU vs. DX-M1, documented results | Upcoming |
+| 8 | CPU vs. NPU benchmark — same workload on host CPU vs. DX-M1, documented results | Deferred |
 
-### Phase 3 — Observability & Scale — Upcoming
+### Phase 3 — Observability & Scale — Deferred
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Grafana alert rules — inference latency SLO (>50ms p95) and NPU temperature ceiling | Upcoming |
-| 2 | Grafana alert rules — pod restart rate and node-down detection | Upcoming |
-| 3 | Alertmanager routing — deliver alerts to a notification channel | Upcoming |
-| 4 | Horizontal Pod Autoscaler on panda-worker containerized workload | Upcoming |
-| 5 | Automated rollback — Alertmanager webhook triggers revert to previous registry tag on SLO breach | Upcoming |
-| 6 | Model output drift detection — track detection count distribution shift over time via Prometheus | Upcoming |
-| 7 | Node failure simulation — cordon/drain panda-worker, verify workload rescheduling | Upcoming |
-| 8 | Secure remote access via Tailscale for live cluster demonstrations | Upcoming |
+| 1 | Grafana alert rules — inference latency SLO (>50ms p95) and NPU temperature ceiling | Deferred |
+| 2 | Grafana alert rules — pod restart rate and node-down detection | Deferred |
+| 3 | Alertmanager routing — deliver alerts to a notification channel | Deferred |
+| 4 | Horizontal Pod Autoscaler on panda-worker containerized workload | Deferred |
+| 5 | Automated rollback — Alertmanager webhook triggers revert to previous registry tag on SLO breach | Deferred |
+| 6 | Model output drift detection — track detection count distribution shift over time via Prometheus | Deferred |
+| 7 | Node failure simulation — cordon/drain panda-worker, verify workload rescheduling | Deferred |
+| 8 | Secure remote access via Tailscale for live cluster demonstrations | Deferred |
