@@ -533,7 +533,7 @@ enable_shared_drives=false
 ## 13. References
 
 - [DeepX Developer Portal](https://developer.deepx.ai)
-- [dx-all-suite README](~/dx-all-suite/README.md)
+- `~/dx-all-suite/README.md` — dx-all-suite README (installed on the node with the DX-M1 SDK)
 - [xrdp Documentation](https://github.com/neutrinolabs/xrdp)
 - [SCRFD Face Detection Paper](https://arxiv.org/abs/2105.04714)
 - [DX-M1 Setup Guide](/docs/hardware/dx-m1-setup-guide.md) - Full installation guide
